@@ -47,7 +47,7 @@
 #define relayOff false
 
 #define veryShortDelay 100
-#define shortDelay     500
+#define shortDelay     250
 #define mediumDelay    1000
 #define longDelay      2000
 #define veryLongDelay  5000
@@ -123,8 +123,6 @@ int previousStatus = statusUNKNOWN;
 
 Task task_determineAlertStatus(5 * TASK_SECOND, TASK_FOREVER, &determineAlertStatus, &ts, false, NULL, &determineAlertStatusDisabled);
 
-#define DURATION 10000
-#define PERIOD2 400
 void critical_ON();
 void critical_OFF();
 
@@ -135,13 +133,9 @@ void warning_ON();
 void warning_OFF();
 
 
-Task tCritical ( PERIOD2 * TASK_MILLISECOND, TASK_FOREVER, &critical_ON, &ts, false );
-
-#define PERIOD3 400
-Task tFailure ( PERIOD3 * TASK_MILLISECOND, TASK_FOREVER, &failure_ON, &ts, false );
-
-#define PERIOD4 100
-Task tWarning ( PERIOD4 * TASK_MILLISECOND, TASK_FOREVER, &warning_ON, &ts, false );
+Task tCritical ( shortDelay * TASK_MILLISECOND, TASK_FOREVER, &critical_ON, &ts, false );
+Task tFailure ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &failure_ON, &ts, false );
+Task tWarning ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &warning_ON, &ts, false );
 
 
 void setup() {
