@@ -8,6 +8,17 @@
 #include <TaskScheduler.h>
 
 
+#define ALL    1000
+#define TRACE   600
+#define DEBUG   500
+#define INFO    400
+#define WARN    300
+#define ERROR   200
+#define FATAL   100
+#define OFF       0
+
+#define logLevel DEBUG
+
 // #define _TASK_TIMECRITICAL      // Enable monitoring scheduling overruns
 #define _TASK_SLEEP_ON_IDLE_RUN    // Enable 1 ms SLEEP_IDLE powerdowns between tasks if no callback methods were invoked during the pass 
 //#define _TASK_STATUS_REQUEST     // Compile with support for StatusRequest functionality - triggering tasks on status change events in addition to time only
@@ -111,6 +122,9 @@ void switchPowerRelays(int);
 
 void oled(String, float*);
 
+void log(int,  String);
+void logNL(int,  String);
+
 Scheduler ts;
 
 #define statusOK        1
@@ -140,9 +154,10 @@ Task tWarning ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &warning_ON, &ts, 
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("/----------------------------------------------------------\\");
-  Serial.println("| Starting...                                              |");
-  Serial.println("\\----------------------------------------------------------/");
+  logNL(ALL, ""); logNL(ALL, "");
+  logNL(ALL, "/----------------------------------------------------------\\");
+  logNL(ALL, "| Starting...                                              |");
+  logNL(ALL, "\\----------------------------------------------------------/");
 
   pinMode(Red,    OUTPUT);
   pinMode(Green,  OUTPUT);
@@ -490,4 +505,20 @@ void warning_ON() {
 void warning_OFF() {
   LEDOff(Green);
   tWarning.setCallback( &warning_ON );
+}
+
+
+
+void log(int requestedLogLevel,  String text)
+{
+  if (requestedLogLevel >= logLevel)
+  {
+    Serial.print(text);
+  }
+}
+
+void logNL(int requestedLogLevel,  String text)
+{
+  text = text + "\n";
+  log(requestedLogLevel, text);
 }
