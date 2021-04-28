@@ -123,7 +123,10 @@ void switchPowerRelays(int);
 void oled(String, float*);
 
 void log(int,  String);
+void log(String);
 void logNL(int,  String);
+void logNL(String);
+
 
 Scheduler ts;
 
@@ -154,10 +157,10 @@ Task tWarning ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &warning_ON, &ts, 
 
 void setup() {
   Serial.begin(115200);
-  logNL(ALL, ""); logNL(ALL, "");
-  logNL(ALL, "/----------------------------------------------------------\\");
-  logNL(ALL, "| Starting...                                              |");
-  logNL(ALL, "\\----------------------------------------------------------/");
+  logNL(""); logNL(ALL, "");
+  logNL("/----------------------------------------------------------\\");
+  logNL("| Starting...                                              |");
+  logNL("\\----------------------------------------------------------/");
 
   pinMode(Red,    OUTPUT);
   pinMode(Green,  OUTPUT);
@@ -521,4 +524,15 @@ void logNL(int requestedLogLevel,  String text)
 {
   text = text + "\n";
   log(requestedLogLevel, text);
+}
+
+
+void log(String text)
+{
+  log(ALL, text);
+}
+
+void logNL(String text)
+{
+  logNL(ALL, text);
 }
