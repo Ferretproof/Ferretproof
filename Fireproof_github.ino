@@ -6,18 +6,9 @@
 #include <DallasTemperature.h>
 #include <NTPClient.h>
 #include <TaskScheduler.h>
+#include "Arduino_DebugUtils.h"
 
 
-#define ALL    1000
-#define TRACE   600
-#define DEBUG   500
-#define INFO    400
-#define WARN    300
-#define ERROR   200
-#define FATAL   100
-#define OFF       0
-
-#define logLevel DEBUG
 
 // #define _TASK_TIMECRITICAL      // Enable monitoring scheduling overruns
 #define _TASK_SLEEP_ON_IDLE_RUN    // Enable 1 ms SLEEP_IDLE powerdowns between tasks if no callback methods were invoked during the pass 
@@ -122,10 +113,6 @@ void switchPowerRelays(int);
 
 void oled(String, float*);
 
-void log(int,  String);
-void log(String);
-void logNL(int,  String);
-void logNL(String);
 
 
 Scheduler ts;
@@ -155,12 +142,38 @@ Task tFailure ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &failure_ON, &ts, 
 Task tWarning ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &warning_ON, &ts, false );
 
 
+
 void setup() {
   Serial.begin(115200);
-  logNL(""); logNL(ALL, "");
-  logNL("/----------------------------------------------------------\\");
-  logNL("| Starting...                                              |");
-  logNL("\\----------------------------------------------------------/");
+  Debug.timestampOff();
+
+  Serial.println(""); 
+  
+
+//  Debug.setDebugLevel(DBG_VERBOSE);
+//  
+//  Debug.print(DBG_NONE, "DBG_NONE");
+//  Debug.print(DBG_ERROR, "DBG_ERROR");
+//  Debug.print(DBG_WARNING, "DBG_WARNING");
+//  Debug.print(DBG_INFO, "DBG_INFO");
+//  Debug.print(DBG_DEBUG, "DBG_DEBUG");
+//  Debug.print(DBG_VERBOSE, "DBG_VERBOSE");
+//
+//  Debug.setDebugLevel(DBG_INFO);
+//  
+//  Debug.print(DBG_NONE, "DBG_NONE");
+//  Debug.print(DBG_ERROR, "DBG_ERROR");
+//  Debug.print(DBG_WARNING, "DBG_WARNING");
+//  Debug.print(DBG_INFO, "DBG_INFO");
+//  Debug.print(DBG_DEBUG, "DBG_DEBUG");
+//  Debug.print(DBG_VERBOSE, "DBG_VERBOSE");
+
+  Debug.setDebugLevel(DBG_INFO);
+  
+  Debug.print(DBG_ERROR, "setup:: \n\n");
+  Debug.print(DBG_ERROR, "setup:: /----------------------------------------------------------\\");
+  Debug.print(DBG_ERROR, "setup:: | Starting...                                              |");
+  Debug.print(DBG_ERROR, "setup:: \\----------------------------------------------------------/");
 
   pinMode(Red,    OUTPUT);
   pinMode(Green,  OUTPUT);
@@ -200,13 +213,8 @@ void printTemperature(float sensorTemperature[]){
   int nrOfSensors = numberOfSensors;
   for(int i=0; i<nrOfSensors; i++)
   {
-    Serial.print("Sensor ");
-    Serial.print(i);
-    Serial.print(" temp: ");
-    Serial.print(temperatures[i]);
-    Serial.print(" ");
+    Debug.print(DBG_ERROR, "printTemperature:: Sensor %d: temp: %.2f  ", i, temperatures[i]);
   }
-  Serial.println("");
 }
 
 void setLedStatus(int color, int status) {
@@ -237,7 +245,7 @@ void setLedStatus(int color, int status) {
 }
 
 void switchRelay(int relay, bool status) {
-  Serial.println("switchRelay::");
+  Debug.print(DBG_INFO, "switchRelay:: %d, %s", relay, status ? "ON":"OFF");
   digitalWrite(relay, status);
 }
 
@@ -272,6 +280,7 @@ float* getTemperatures(float sensorTemperature[]) {
   for (int i=0; i<nrOfSensors; i++)
   {
     sensorTemperature[i] = sensors.getTempCByIndex(i);
+    Debug.print(DBG_DEBUG, "getTemperatures:: sensor %d = %.2f", sensorTemperature[i]);
   }
   
   return sensorTemperature;
@@ -292,7 +301,7 @@ void determineAlertStatus() {
   String statusText         = "?";
   int i                     = 0; 
   
-  Serial.println("determineAlertStatus:: start");
+  Debug.print(DBG_DEBUG, "determineAlertStatus:: start");
   temperatures    = getTemperatures(temperatureArray);
   printTemperature(temperatures);
 
@@ -315,9 +324,7 @@ t4   t <= ok                     OK      OK      CRIT    FAIL        OK      --/
 */
 
     if (temp == 85){
-      glitchProtection++;
-      if (glitchProtection < 3)
-      {   break;    }
+      glitchProtection++;      if (glitchProtection < 3)    {   break;    }
     }
     else {   glitchProtection = 0;    }
 
@@ -333,66 +340,58 @@ t4   t <= ok                     OK      OK      CRIT    FAIL        OK      --/
     bool s3 = (previousStatus == statusFAILURE);
     bool s4 = (previousStatus == statusUNKNOWN);
 
-    Serial.print("s0: ");
-    Serial.print(s0);
-    
-    Serial.print("  s1: ");
-    Serial.print(s1);
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: t0 = %s", t0 ? "true":"false");
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: t1 = %s", t1 ? "true":"false");
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: t2 = %s", t2 ? "true":"false");
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: t3 = %s", t3 ? "true":"false");
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: t4 = %s", t4 ? "true":"false");
 
-    Serial.print("  s2: ");
-    Serial.print(s2);
-    
-    Serial.print("  s3: ");
-    Serial.print(s3);
-
-    Serial.print("  s4: ");
-    Serial.println(s4);
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: s0 = %s", s0 ? "true":"false");
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: s1 = %s", s1 ? "true":"false");
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: s2 = %s", s2 ? "true":"false");
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: s3 = %s", s3 ? "true":"false");
+    Debug.print(DBG_VERBOSE, "determineAlertStatus:: s4 = %s", s4 ? "true":"false");
 
 
-    if (t0 && (s0 || s1 || s3 || s4))     {    failureStatusLevel  = 1;  break;   }
-    if (t0 && !s2)                        {    criticalStatusLevel = 1;  break;   }
+    if (t0 && (s0 || s1 || s3 || s4))     {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 01") ; failureStatusLevel  = 1;  break;   }
+    if (t0 && !s2)                        {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 02") ; criticalStatusLevel = 1;  break;   }
     
-    if (t1)                               {    criticalStatusLevel = 1;  break;   }
+    if (t1)                               {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 03") ; criticalStatusLevel = 1;  break;   }
     
-    if (t2 && (!s2 && !s3 && !s4))        {    warningStatusLevel  = 1;           }
-    if (t2 && s2)                         {    criticalStatusLevel = 1;  break;   }
-    if (t2 && s3)                         {    failureStatusLevel  = 1;           }
-    if (t2 && s4)                         {    warningStatusLevel  = 1;           }
+    if (t2 && (!s2 && !s3 && !s4))        {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 04") ; warningStatusLevel  = 1;           }
+    if (t2 && s2)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 05") ; criticalStatusLevel = 1;  break;   }
+    if (t2 && s3)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 06") ; failureStatusLevel  = 1;           }
+    if (t2 && s4)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 07") ; warningStatusLevel  = 1;           }
     
-    if (t3 && s0)                         {    okStatusLevel++;                   }
-    if (t3 && s1)                         {    warningStatusLevel  = 1;           }
-    if (t3 && s2)                         {    criticalStatusLevel = 1;  break;   }
-    if (t3 && s3)                         {    failureStatusLevel  = 1;           }
-    if (t3 && s4)                         {    warningStatusLevel  = 1;           }
+    if (t3 && s0)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 08") ; okStatusLevel++;                   }
+    if (t3 && s1)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 09") ; warningStatusLevel  = 1;           }
+    if (t3 && s2)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 10") ; criticalStatusLevel = 1;  break;   }
+    if (t3 && s3)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 11") ; failureStatusLevel  = 1;           }
+    if (t3 && s4)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 12") ; warningStatusLevel  = 1;           }
   
-    if (t4 && (s0 || s1 || s4))           {    okStatusLevel++;                   }
-    if (t4 && s2)                         {    criticalStatusLevel = 1;  break;   }
-    if (t4 && s3)                         {    failureStatusLevel  = 1;           }
+    if (t4 && (s0 || s1 || s4))           {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 13") ; okStatusLevel++;                   }
+    if (t4 && s2)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 14") ; criticalStatusLevel = 1;  break;   }
+    if (t4 && s3)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 15") ; failureStatusLevel  = 1;           }
   }
   
-  if (criticalStatusLevel != 0)
-  {
-    Serial.println(" == CRITICAL ==");
+  if (criticalStatusLevel != 0)  {
+    Debug.print(DBG_WARNING, "determineAlertStatus::  == CRITICAL ==");
     newStatus = statusCRITICAL;
   }
-  else if (failureStatusLevel != 0)
-  {
-    Serial.println(" == FAILURE =="); 
+  else if (failureStatusLevel != 0)  {
+    Debug.print(DBG_WARNING, "determineAlertStatus::  == FAILURE =="); 
     newStatus = statusFAILURE;
   }
-  else if (warningStatusLevel != 0)
-  {
-    Serial.println(" == WARNING ==");
+  else if (warningStatusLevel != 0)  {
+    Debug.print(DBG_WARNING, "determineAlertStatus::  == WARNING ==");
     newStatus = statusWARNING;
   }
-  else if (okStatusLevel == nrOfSensors)
-  {
-    Serial.println(" == OK ==");
+  else if (okStatusLevel == nrOfSensors)  {
+    Debug.print(DBG_WARNING, "determineAlertStatus::  == OK ==");
     newStatus = statusOK;
   }
-  else
-  {
-    Serial.println(" == UNKNOWN ==");
+  else  {
+    Debug.print(DBG_ERROR, "determineAlertStatus::  == UNKNOWN STATUS ==");
     newStatus = statusUNKNOWN;
   }
 
@@ -443,12 +442,12 @@ t4   t <= ok                     OK      OK      CRIT    FAIL        OK      --/
 // ----------------------------------------------------------------------
 
 void determineAlertStatusDisabled() {
-  Serial.println("determineAlertStatusDisabled:: start");
+  Debug.print(DBG_VERBOSE, "determineAlertStatusDisabled:: start");
 }
 
 void oledData(String statusText, float temperatures[])
 {
-  Serial.println("STATUS: " + statusText);
+  Debug.print(DBG_VERBOSE, "oledData::");
   printTemperature(temperatures);
 }
 
@@ -458,9 +457,6 @@ void switchPowerRelays(int relayStatus) {
   switchRelay(RELAY3, relayStatus);
   switchRelay(RELAY4, relayStatus);
 }
-
-
-
 
 inline void LEDOn(int color) {
   if (color == Yellow)
@@ -508,31 +504,4 @@ void warning_ON() {
 void warning_OFF() {
   LEDOff(Green);
   tWarning.setCallback( &warning_ON );
-}
-
-
-
-void log(int requestedLogLevel,  String text)
-{
-  if (requestedLogLevel >= logLevel)
-  {
-    Serial.print(text);
-  }
-}
-
-void logNL(int requestedLogLevel,  String text)
-{
-  text = text + "\n";
-  log(requestedLogLevel, text);
-}
-
-
-void log(String text)
-{
-  log(ALL, text);
-}
-
-void logNL(String text)
-{
-  logNL(ALL, text);
 }
