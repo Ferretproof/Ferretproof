@@ -7,7 +7,7 @@
 #include <NTPClient.h>
 #include <TaskScheduler.h>
 #include "Arduino_DebugUtils.h"
-
+#include "SSD1306Wire.h"        // legacy: #include "SSD1306.h"
 
 
 // #define _TASK_TIMECRITICAL      // Enable monitoring scheduling overruns
@@ -68,17 +68,18 @@
 OneWire oneWire(ONE_WIRE_BUS  );
 DallasTemperature sensors(&oneWire);
 
-#define numberOfSensors  2;
+#define numberOfSensors  3;
 
 float* getTemperatures(float[]);
 float *temperatures;
-float temperatureArray[3] = {0.0, 0.0, 0.0};
+float temperatureArray[4] = {0.0, 0.0, 0.0, 0.0};
 
-float criticalTemperature[3] = {31.0, 31.0, 31.0};
-float warningTemperature[3]  = {29.0, 29.0, 29.0};
-float okTemperature[3]       = {27.0, 27.0, 27.0};
+float criticalTemperature[4] = {31.0, 31.0, 31.0, 31.0};
+float warningTemperature[4]  = {29.0, 29.0, 29.0, 29.0};
+float okTemperature[4]       = {27.0, 27.0, 27.0, 27.0};
+String sensorLocation[4]     = {"top", "noz", "pwr", "cpu"};
 
-int glitchProtection = 0;   // should prevent problems when sensor hits 85C (this is usually a short glitch).
+int glitchProtection = 0;   // should prevent problems when sensor hits 85C (this is usually a short glitch). - not implemented 20210430
 
 boolean ledStatus = false;  // off
 
@@ -136,39 +137,107 @@ void failure_OFF();
 void warning_ON();
 void warning_OFF();
 
+void printDisplay(String, int);
+void printDisplay(String, int, int);
+Task tCritical (  shortDelay * TASK_MILLISECOND, TASK_FOREVER, &critical_ON, &ts, false );
+Task tFailure  ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &failure_ON,  &ts, false );
+Task tWarning  ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &warning_ON,  &ts, false );
 
-Task tCritical ( shortDelay * TASK_MILLISECOND, TASK_FOREVER, &critical_ON, &ts, false );
-Task tFailure ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &failure_ON, &ts, false );
-Task tWarning ( mediumDelay * TASK_MILLISECOND, TASK_FOREVER, &warning_ON, &ts, false );
+int screenwidth = 126;
+int screenheight = 64;
+int textPositionLeft    = 0;
+int textPositionRight   = 70;
+int textPositionCenter  = 20;
+
+SSD1306Wire display(0x3c, D2, D1);   // ADDRESS, SDA, SCL  -  SDA and SCL usually populate automatically based on your board's pins_arduino.h
 
 
 
 void setup() {
   Serial.begin(115200);
   Debug.timestampOff();
+  
+  
+  display.init();
 
-  Serial.println(""); 
+//  display.flipScreenVertically();
+  display.setFont(ArialMT_Plain_10);
+  display.clear();
+  display.display();
+  
+  printDisplay("Booting...", 0, 0);
   
 
-//  Debug.setDebugLevel(DBG_VERBOSE);
-//  
-//  Debug.print(DBG_NONE, "DBG_NONE");
-//  Debug.print(DBG_ERROR, "DBG_ERROR");
-//  Debug.print(DBG_WARNING, "DBG_WARNING");
-//  Debug.print(DBG_INFO, "DBG_INFO");
-//  Debug.print(DBG_DEBUG, "DBG_DEBUG");
-//  Debug.print(DBG_VERBOSE, "DBG_VERBOSE");
-//
-//  Debug.setDebugLevel(DBG_INFO);
-//  
-//  Debug.print(DBG_NONE, "DBG_NONE");
-//  Debug.print(DBG_ERROR, "DBG_ERROR");
-//  Debug.print(DBG_WARNING, "DBG_WARNING");
-//  Debug.print(DBG_INFO, "DBG_INFO");
-//  Debug.print(DBG_DEBUG, "DBG_DEBUG");
-//  Debug.print(DBG_VERBOSE, "DBG_VERBOSE");
+// . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) 
+  {
+    Debug.print(DBG_ERROR, "WIFI Connection Failed! Rebooting...");
+    delay(5000);
+    ESP.restart();
+  }
 
-  Debug.setDebugLevel(DBG_INFO);
+  // Port defaults to 8266
+  ArduinoOTA.setPort(8266);
+
+  // Hostname defaults to esp8266-[ChipID]
+  ArduinoOTA.setHostname("Fireproof");
+
+  // No authentication by default
+  ArduinoOTA.setPassword("admin");
+
+  // Password can be set with it's md5 value as well
+  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
+
+  // generated using echo -n 'the password' | md5sum.exe
+  //ArduinoOTA.setPasswordHash("5163ef35d45511844f246a691356dea4");
+
+  ArduinoOTA.onStart([]()   {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) 
+    {
+      type = "sketch";
+    }
+    else 
+    { // U_FS
+      type = "filesystem";
+    }
+
+    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+    Serial.println("OTA: Start updating " + type);
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nOTA: End");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("OTA: Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("OTA: Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("OTA: Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("OTA: Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("OTA: Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("OTA: Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("OTA: End Failed");
+    }
+  });
+  ArduinoOTA.begin();
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP().toString());
+
+  printDisplay("ip: " + WiFi.localIP().toString(), 2, 0);
+   
+  
+// . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+
+  Debug.setDebugLevel(DBG_DEBUG);
   
   Debug.print(DBG_ERROR, "setup:: \n\n");
   Debug.print(DBG_ERROR, "setup:: /----------------------------------------------------------\\");
@@ -186,11 +255,11 @@ void setup() {
   setLedStatus(Red, ledOn);
   setLedStatus(Green, ledOn);
 
-  for (int i=0; i<5; i++)
+  for (int i=0; i<3; i++)
   { 
     temperatures    = getTemperatures(temperatureArray);
-    printTemperature(temperatures);
-    delay(500);
+//    printTemperature(temperatures);
+    delay(250);
   }
   
   task_determineAlertStatus.enable();
@@ -198,6 +267,7 @@ void setup() {
 
 void loop() {
   ts.execute();
+  ArduinoOTA.handle();
 }
 
 void flashRedLed(){
@@ -214,6 +284,7 @@ void printTemperature(float sensorTemperature[]){
   for(int i=0; i<nrOfSensors; i++)
   {
     Debug.print(DBG_ERROR, "printTemperature:: Sensor %d: temp: %.2f  ", i, temperatures[i]);
+//    printDisplay("Sensor " + String(i) + ": " + String(temperatures[i]), i);
   }
 }
 
@@ -281,6 +352,7 @@ float* getTemperatures(float sensorTemperature[]) {
   {
     sensorTemperature[i] = sensors.getTempCByIndex(i);
     Debug.print(DBG_DEBUG, "getTemperatures:: sensor %d = %.2f", sensorTemperature[i]);
+//    printDisplay("Sensor" + i + " = " + sensorTemperature[i], i);
   }
   
   return sensorTemperature;
@@ -300,6 +372,8 @@ void determineAlertStatus() {
   int failureStatusLevel    = 0;
   String statusText         = "?";
   int i                     = 0; 
+
+  
   
   Debug.print(DBG_DEBUG, "determineAlertStatus:: start");
   temperatures    = getTemperatures(temperatureArray);
@@ -328,11 +402,11 @@ t4   t <= ok                     OK      OK      CRIT    FAIL        OK      --/
     }
     else {   glitchProtection = 0;    }
 
-    bool t0 = (temp < -120);
-    bool t1 = (temp > criticalTemperature[i]);
-    bool t2 = ((temp > warningTemperature[i]) && (temp <= criticalTemperature[i])) ;
-    bool t3 = ((temp > okTemperature[i]) && (temp <= warningTemperature[i]));
-    bool t4 = (temp <= okTemperature[i]);
+    bool t0 = (temp  < -120);
+    bool t1 = (temp  > criticalTemperature[i]);
+    bool t2 = ((temp >  warningTemperature[i]) && (temp <= criticalTemperature[i])) ;
+    bool t3 = ((temp >       okTemperature[i]) && (temp <= warningTemperature[i]));
+    bool t4 = ((temp <=       okTemperature[i]) && (temp >= -120));
 
     bool s0 = (previousStatus == statusOK);
     bool s1 = (previousStatus == statusWARNING);
@@ -351,27 +425,29 @@ t4   t <= ok                     OK      OK      CRIT    FAIL        OK      --/
     Debug.print(DBG_VERBOSE, "determineAlertStatus:: s2 = %s", s2 ? "true":"false");
     Debug.print(DBG_VERBOSE, "determineAlertStatus:: s3 = %s", s3 ? "true":"false");
     Debug.print(DBG_VERBOSE, "determineAlertStatus:: s4 = %s", s4 ? "true":"false");
-
-
-    if (t0 && (s0 || s1 || s3 || s4))     {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 01") ; failureStatusLevel  = 1;  break;   }
-    if (t0 && !s2)                        {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 02") ; criticalStatusLevel = 1;  break;   }
-    
-    if (t1)                               {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 03") ; criticalStatusLevel = 1;  break;   }
-    
-    if (t2 && (!s2 && !s3 && !s4))        {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 04") ; warningStatusLevel  = 1;           }
-    if (t2 && s2)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 05") ; criticalStatusLevel = 1;  break;   }
-    if (t2 && s3)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 06") ; failureStatusLevel  = 1;           }
-    if (t2 && s4)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 07") ; warningStatusLevel  = 1;           }
-    
-    if (t3 && s0)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 08") ; okStatusLevel++;                   }
-    if (t3 && s1)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 09") ; warningStatusLevel  = 1;           }
-    if (t3 && s2)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 10") ; criticalStatusLevel = 1;  break;   }
-    if (t3 && s3)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 11") ; failureStatusLevel  = 1;           }
-    if (t3 && s4)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 12") ; warningStatusLevel  = 1;           }
   
-    if (t4 && (s0 || s1 || s4))           {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 13") ; okStatusLevel++;                   }
-    if (t4 && s2)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 14") ; criticalStatusLevel = 1;  break;   }
-    if (t4 && s3)                         {    Debug.print(DBG_DEBUG, "determineAlertStatus:: 15") ; failureStatusLevel  = 1;           }
+    int hit=0;
+  
+    if (t0 && s2)                         {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 01") ; criticalStatusLevel = 1;  break;   }
+    if (t0 && !s2)                        {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 02") ; failureStatusLevel  = 1;           }
+    if (t1)                               {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 03") ; criticalStatusLevel = 1;  break;   }
+    if (t2 && (s0 || s1 || s4))           {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 04") ; warningStatusLevel  = 1;           }
+    if (t2 && s2)                         {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 05") ; criticalStatusLevel = 1;  break;   }
+    if (t2 && s3)                         {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 06") ; failureStatusLevel  = 1;           }
+    if (t3 && (s0 || s4))                 {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 07") ; okStatusLevel++;                   }
+    if (t3 && (s1))                       {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 08") ; warningStatusLevel  = 1;           }
+    if (t3 && (s2))                       {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 09") ; criticalStatusLevel = 1;  break;   }
+    if (t3 && (s3))                       {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 10") ; failureStatusLevel  = 1;           }
+    if (t4 && (s0 || s1 || s4))           {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 11") ; okStatusLevel++;                   }
+    if (t4 && (s2))                       {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 12") ; criticalStatusLevel = 1;  break;   }
+    if (t4 && (s3))                       {    hit++; Debug.print(DBG_DEBUG, "determineAlertStatus:: 13") ; failureStatusLevel  = 1;           }
+
+    if (hit != 1)
+    {
+      Debug.print(DBG_ERROR, "---------------------------------------------------------------------------");
+      Debug.print(DBG_ERROR, "Hit != 1 !!! Hit = %d", hit);
+      Debug.print(DBG_ERROR, "---------------------------------------------------------------------------");
+    }
   }
   
   if (criticalStatusLevel != 0)  {
@@ -430,13 +506,17 @@ t4   t <= ok                     OK      OK      CRIT    FAIL        OK      --/
   else
   {
     LEDOn(Red);
-    statusText = "INTERNAL ERROR";
+    statusText = "ERROR";
     switchPowerRelays(relayOff);
+    newStatus = statusCRITICAL;
   }
-
-  oledData(statusText, temperatures);
-
+//
+//  display.setFont(ArialMT_Plain_16);
+//  printDisplay(statusText, 5);
+//  display.display();
   previousStatus = newStatus;
+
+  printToOled(statusText, temperatures);
 }
 
 // ----------------------------------------------------------------------
@@ -445,10 +525,25 @@ void determineAlertStatusDisabled() {
   Debug.print(DBG_VERBOSE, "determineAlertStatusDisabled:: start");
 }
 
-void oledData(String statusText, float temperatures[])
+void printToOled(String statusText, float temperatures[])
 {
-  Debug.print(DBG_VERBOSE, "oledData::");
-  printTemperature(temperatures);
+  int nrOfSensors           = numberOfSensors;
+
+  display.setFont(ArialMT_Plain_10);
+  for (int i=0; i<nrOfSensors; i=i+2)
+  {
+    printDisplay(sensorLocation[i] +":" + String(temperatures[i]), (i/2), textPositionLeft);
+  }
+  for (int i=1; i<nrOfSensors; i=i+2)
+  {
+    printDisplay(sensorLocation[i] +":"  + String(temperatures[i]), (i/2), textPositionRight);
+  }
+  
+  printDisplay("Status:", 4, 0);
+  
+  display.setFont(ArialMT_Plain_24);
+  printDisplay(statusText, 4, 40);
+  display.setFont(ArialMT_Plain_10);
 }
 
 void switchPowerRelays(int relayStatus) {
@@ -505,3 +600,52 @@ void warning_OFF() {
   LEDOff(Green);
   tWarning.setCallback( &warning_ON );
 }
+
+
+
+void printDisplay(String message, int lineNr)
+{
+  Serial.print("printDisplay 1:");
+  Serial.print(message);
+  Serial.print(" on 0, " );
+  Serial.println(lineNr*10 );
+
+  printDisplay(message, lineNr, 0);
+}
+
+void printDisplay(String message, int lineNr, int position)
+{
+  int x = position;
+ 
+  Serial.print("printDisplay 2:");
+  Serial.print(message);
+  Serial.print(" on " );
+  Serial.print(x);
+  Serial.print("," );
+  Serial.println(lineNr*10 );
+  
+  if ((lineNr == 0) && (x==0))
+  {
+    display.clear();
+    display.display();
+  }
+ 
+  display.drawString(x, lineNr*10, message);
+  display.display();
+}
+
+
+
+//
+//sendDataToInflux()
+//{
+//
+//}
+//
+//
+//
+//sendMessageToIFTTT(status, temperatures)
+//{
+//  
+//}
+//
