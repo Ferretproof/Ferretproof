@@ -9,6 +9,7 @@
 #include "Arduino_DebugUtils.h"
 #include "SSD1306Wire.h"        // legacy: #include "SSD1306.h"
 
+String version="1.0.1";
 
 // #define _TASK_TIMECRITICAL      // Enable monitoring scheduling overruns
 #define _TASK_SLEEP_ON_IDLE_RUN    // Enable 1 ms SLEEP_IDLE powerdowns between tasks if no callback methods were invoked during the pass 
@@ -68,15 +69,15 @@
 OneWire oneWire(ONE_WIRE_BUS  );
 DallasTemperature sensors(&oneWire);
 
-#define numberOfSensors  3;
+#define numberOfSensors  4;
 
 float* getTemperatures(float[]);
 float *temperatures;
 float temperatureArray[4] = {0.0, 0.0, 0.0, 0.0};
 
-float criticalTemperature[4] = {31.0, 31.0, 31.0, 31.0};
-float warningTemperature[4]  = {29.0, 29.0, 29.0, 29.0};
-float okTemperature[4]       = {27.0, 27.0, 27.0, 27.0};
+float criticalTemperature[4] = {27.0, 27.0, 27.0, 27.0};
+float warningTemperature[4]  = {26.0, 26.0, 26.0, 26.0};
+float okTemperature[4]       = {25.0, 25.0, 25.0, 25.0};
 String sensorLocation[4]     = {"top", "noz", "pwr", "cpu"};
 
 int glitchProtection = 0;   // should prevent problems when sensor hits 85C (this is usually a short glitch). - not implemented 20210430
@@ -160,12 +161,12 @@ void setup() {
   
   display.init();
 
-//  display.flipScreenVertically();
+  display.flipScreenVertically();
   display.setFont(ArialMT_Plain_10);
   display.clear();
   display.display();
   
-  printDisplay("Booting...", 0, 0);
+  printDisplay("Booting... version " + version , 0, 0);
   
 
 // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
@@ -532,17 +533,17 @@ void printToOled(String statusText, float temperatures[])
   display.setFont(ArialMT_Plain_10);
   for (int i=0; i<nrOfSensors; i=i+2)
   {
-    printDisplay(sensorLocation[i] +":" + String(temperatures[i]), (i/2), textPositionLeft);
+    printDisplay(sensorLocation[i] +":" + String(temperatures[i],1) + "C", (i/2), textPositionLeft);
   }
   for (int i=1; i<nrOfSensors; i=i+2)
   {
-    printDisplay(sensorLocation[i] +":"  + String(temperatures[i]), (i/2), textPositionRight);
+    printDisplay(sensorLocation[i] +":"  + String(temperatures[i],1) + "C", (i/2), textPositionRight);
   }
   
-  printDisplay("Status:", 4, 0);
+  printDisplay("Status:", 3, 0);
   
   display.setFont(ArialMT_Plain_24);
-  printDisplay(statusText, 4, 40);
+  printDisplay(statusText, 4, 20);
   display.setFont(ArialMT_Plain_10);
 }
 
