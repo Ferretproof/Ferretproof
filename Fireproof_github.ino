@@ -9,7 +9,7 @@
 #include "Arduino_DebugUtils.h"
 #include "SSD1306Wire.h"        // legacy: #include "SSD1306.h"
 
-String version="1.0.1";
+String version="1.0.2";
 
 // #define _TASK_TIMECRITICAL      // Enable monitoring scheduling overruns
 #define _TASK_SLEEP_ON_IDLE_RUN    // Enable 1 ms SLEEP_IDLE powerdowns between tasks if no callback methods were invoked during the pass 
@@ -75,10 +75,10 @@ float* getTemperatures(float[]);
 float *temperatures;
 float temperatureArray[4] = {0.0, 0.0, 0.0, 0.0};
 
-float criticalTemperature[4] = {27.0, 27.0, 27.0, 27.0};
-float warningTemperature[4]  = {26.0, 26.0, 26.0, 26.0};
-float okTemperature[4]       = {25.0, 25.0, 25.0, 25.0};
-String sensorLocation[4]     = {"top", "noz", "pwr", "cpu"};
+float criticalTemperature[4] = {60.0, 60.0, 80.0, 60.0};
+float warningTemperature[4]  = {50.0, 50.0, 60.0, 50.0};
+float okTemperature[4]       = {45.0, 45.0, 55.0, 45.0};
+String sensorLocation[4]     = {"top", "pwr", "noz", "cpu"};
 
 int glitchProtection = 0;   // should prevent problems when sensor hits 85C (this is usually a short glitch). - not implemented 20210430
 
@@ -161,7 +161,7 @@ void setup() {
   
   display.init();
 
-  display.flipScreenVertically();
+//  display.flipScreenVertically();
   display.setFont(ArialMT_Plain_10);
   display.clear();
   display.display();
